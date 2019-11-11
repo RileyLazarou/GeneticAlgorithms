@@ -38,14 +38,30 @@ class Organism():
         
         return X
 
-    def predict_choice(self, X):
+    def predict_choice(self, X, deterministic=True):
         probabilities = self.predict(X)
-        return np.argmax(probabilities, axis=1).reshape((-1, 1))
+        if deterministic:
+            return np.argmax(probabilities, axis=1).reshape((-1, 1))
+        if any(np.sum(probabilities, axis=1) != 1):
+            raise ValueError(f'Output values must sum to 1 to use deterministic=False')
+        if any(probabilities < 0):
+            raise ValueError(f'Output values cannot be negative to use deterministic=False')
+        choices = np.zeros(X.shape[0])
+        for i in range(X.shape[0]):
+            U = np.random.rand(X.shape[0])
+            c = 0
+            while U > probabilities[i, c]:
+                U -= probabilities[i, c]
+                c += 1
+            else:
+                choices[i] = c
+        return choices.reshape((-1,1))
 
     def mutate(self, stdev=0.03):
         for i in range(len(self.layers)):
             self.layers[i] += np.random.normal(0, stdev, self.layers[i].shape)
-            self.biases[i] += np.random.normal(0, stdev, self.biases[i].shape)
+            if self.use_bias:
+                self.biases[i] += np.random.normal(0, stdev, self.biases[i].shape)
 
     def mate(self, other, mutate=True):
         if self.use_bias != other.use_bias:
@@ -110,12 +126,11 @@ def main():
     Learn and visualize a function from [0,1] to something else
     '''
     import matplotlib.pyplot as plt
-    actual_f = lambda x : np.sin(x*2*np.pi*3) + np.cos(x*2*np.pi*2)  # the function to learn, y = sin(x * 6 * pi)
+    actual_f = lambda x : np.sin(x*6*np.pi)  # the function to learn, y = sin(x * 6 * pi)
     loss_f = lambda y, y_hat : np.mean(np.abs(y - y_hat)**2)  # the loss function (negative reward)
     X = np.linspace(0, 1, 200)
 
     def simulate_and_evaluate(organism, replicates=100):
-        loss = 0
         X = np.random.random((replicates, 1))
         predictions = organism.predict(X)
         loss = loss_f(actual_f(X), predictions)
