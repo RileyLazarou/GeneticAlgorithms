@@ -7,7 +7,8 @@ class Organism():
         self.layers = []
         self.biases = []
         self.use_bias = use_bias
-        self.output = self._activation(output)
+        self.output = output
+        self.output_activation = self._activation(output)
         for i in range(len(dimensions)-1):
             shape = (dimensions[i], dimensions[i+1])
             std = np.sqrt(2 / sum(shape))
@@ -23,6 +24,8 @@ class Organism():
             return lambda X : (1 / (1 + np.exp(-X)))
         if output == 'linear':
             return lambda X : X
+        if output == 'tanh':
+            return lambda X : np.tanh(X)
 
     def predict(self, X):
         if not X.ndim == 2:
@@ -32,7 +35,7 @@ class Organism():
         for index, (layer, bias) in enumerate(zip(self.layers, self.biases)):
             X = X @ layer + np.ones((X.shape[0], 1)) @ bias
             if index == len(self.layers) - 1:
-                X = self.output(X) # output activation
+                X = self.output_activation(X) # output activation
             else:
                 X = np.clip(X, 0, np.inf)  # ReLU
         
@@ -80,11 +83,18 @@ class Organism():
             child.mutate()
         return child
 
+    def organism_like(self):
+        '''
+        Return a new organism with the same shape and activations but reinitialized weights
+        '''
+        dimensions = [x.shape[0] for x in self.layers] + [self.layers[-1].shape[1]]
+        return Organism(dimensions, use_bias=self.use_bias, output=self.output)
+
 
 class Ecosystem():
-    def __init__(self, original_f, scoring_function, population_size=100, holdout='sqrt', mating=True):
-        self.population_size = population_size=100
-        self.population = [original_f() for _ in range(population_size)]
+    def __init__(self, holotype, scoring_function, population_size=100, holdout='sqrt', mating=True):
+        self.population_size = population_size
+        self.population = [holotype.organism_like() for _ in range(population_size)]
         self.scoring_function = scoring_function
         if holdout == 'sqrt':
             self.holdout = max(1, int(np.sqrt(population_size)))
@@ -108,8 +118,9 @@ class Ecosystem():
                 parent_2_idx = parent_1_idx
             offspring = self.population[parent_1_idx].mate(self.population[parent_2_idx])
             new_population.append(offspring)
-        if keep_best:
-            new_population[-1] = self.population[0] # Ensure best organism survives
+
+        new_population[-2] = self.population[0].organism_like()
+        #new_population[-1] = self.population[0]
         self.population = new_population
 
     def get_best_organism(self, repeats=1, include_reward=False):
@@ -127,27 +138,27 @@ def main():
     '''
     import matplotlib.pyplot as plt
     actual_f = lambda x : np.sin(x*6*np.pi)  # the function to learn, y = sin(x * 6 * pi)
-    loss_f = lambda y, y_hat : np.mean(np.abs(y - y_hat)**2)  # the loss function (negative reward)
+    loss_f = lambda y, y_hat : np.mean(np.abs(y - y_hat)**(2))  # the loss function (negative reward)
     X = np.linspace(0, 1, 200)
 
-    def simulate_and_evaluate(organism, replicates=100):
-        X = np.random.random((replicates, 1))
+    def simulate_and_evaluate(organism, replicates=500):
+        X = np.linspace(0, 1, replicates).reshape((replicates, 1))
         predictions = organism.predict(X)
         loss = loss_f(actual_f(X), predictions)
         return -loss
 
-    scoring_function = lambda organism : simulate_and_evaluate(organism, replicates=100)
+    scoring_function = lambda organism : simulate_and_evaluate(organism, replicates=500)
 
-    original_f = lambda : Organism([1, 16, 16, 16, 1], output='linear')
-    ecosystem = Ecosystem(original_f, scoring_function, population_size=100, mating=True)
+    original_organism = Organism([1, 16,16,16, 1], output='linear', use_bias=True)
+    ecosystem = Ecosystem(original_organism, scoring_function, population_size=100, mating=True)
     best_organisms = [ecosystem.get_best_organism()]
-    for i in range(5000):
+    for i in range(1000):
         ecosystem.generation()
         this_generation_best = ecosystem.get_best_organism(include_reward=True)
         best_organisms.append(this_generation_best[0])
         if i % 10 == 0:
             print(f'{i}: {this_generation_best[1]:.2f}')
-        if i % 500 == 0 and False:
+        if i % 10 == 0 and False:
             plt.scatter(X, best_organisms[-1].predict(X.reshape(-1,1)).flatten(), label='Predictions')
             plt.plot(X, actual_f(X), label='Target', c='k')
             plt.legend()
