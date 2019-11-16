@@ -106,8 +106,8 @@ class Ecosystem():
             self.holdout = max(1, int(holdout))
         self.mating = True
 
-    def generation(self, repeats=1, keep_best=True):
-        rewards = [np.mean(self.scoring_function(x)) for _ in range(repeats) for x in self.population]
+    def generation(self, keep_best=True):
+        rewards = [self.scoring_function(x) for x in self.population]
         self.population = [self.population[x] for x in np.argsort(rewards)[::-1]]
         new_population = []
         for i in range(self.population_size):
@@ -123,8 +123,8 @@ class Ecosystem():
         #new_population[-1] = self.population[0]
         self.population = new_population
 
-    def get_best_organism(self, repeats=1, include_reward=False):
-        rewards = [np.mean(self.scoring_function(x)) for _ in range(repeats) for x in self.population]
+    def get_best_organism(self, include_reward=False):
+        rewards = [self.scoring_function(x) for x in self.population]
         if include_reward:
             best = np.argsort(rewards)[-1]
             return self.population[best], rewards[best]
