@@ -106,9 +106,17 @@ class Ecosystem():
             self.holdout = max(1, int(holdout))
         self.mating = True
 
-    def generation(self, keep_best=True):
-        rewards = [self.scoring_function(x) for x in self.population]
+
+    def generation(self, verbose=False):
+        rewards = []
+        for index, organism in enumerate(self.population):
+            if verbose:
+                print(f'{index+1}/{self.population_size}', end='\r')
+            reward = self.scoring_function(organism)
+            rewards.append(reward)
         self.population = [self.population[x] for x in np.argsort(rewards)[::-1]]
+        best_organism = self.population[0]
+        best_score = max(rewards)
         new_population = []
         for i in range(self.population_size):
             parent_1_idx = i % self.holdout
@@ -118,10 +126,12 @@ class Ecosystem():
                 parent_2_idx = parent_1_idx
             offspring = self.population[parent_1_idx].mate(self.population[parent_2_idx])
             new_population.append(offspring)
+        return best_organism, best_score
+            
 
-        new_population[-2] = self.population[0].organism_like()
         #new_population[-1] = self.population[0]
         self.population = new_population
+
 
     def get_best_organism(self, include_reward=False):
         rewards = [self.scoring_function(x) for x in self.population]
