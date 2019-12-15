@@ -3,12 +3,13 @@ import copy
 import numpy as np
 
 class Organism():
-    def __init__(self, dimensions, use_bias=True, output='softmax'):
+    def __init__(self, dimensions, use_bias=True, output='softmax', mutation_std=0.05):
         self.layers = []
         self.biases = []
         self.use_bias = use_bias
         self.output = output
         self.output_activation = self._activation(output)
+        self.mutation_std = mutation_std
         for i in range(len(dimensions)-1):
             shape = (dimensions[i], dimensions[i+1])
             std = np.sqrt(2 / sum(shape))
@@ -26,6 +27,8 @@ class Organism():
             return lambda X : X
         if output == 'tanh':
             return lambda X : np.tanh(X)
+        else:
+            return output
 
     def predict(self, X):
         if not X.ndim == 2:
@@ -60,11 +63,11 @@ class Organism():
                 choices[i] = c
         return choices.reshape((-1,1))
 
-    def mutate(self, stdev=0.03):
+    def mutate(self):
         for i in range(len(self.layers)):
-            self.layers[i] += np.random.normal(0, stdev, self.layers[i].shape)
+            self.layers[i] += np.random.normal(0, self.mutation_std, self.layers[i].shape)
             if self.use_bias:
-                self.biases[i] += np.random.normal(0, stdev, self.biases[i].shape)
+                self.biases[i] += np.random.normal(0, self.mutation_std, self.biases[i].shape)
 
     def mate(self, other, mutate=True):
         if self.use_bias != other.use_bias:
@@ -88,11 +91,11 @@ class Organism():
         Return a new organism with the same shape and activations but reinitialized weights
         '''
         dimensions = [x.shape[0] for x in self.layers] + [self.layers[-1].shape[1]]
-        return Organism(dimensions, use_bias=self.use_bias, output=self.output)
+        return Organism(dimensions, use_bias=self.use_bias, output=self.output, mutation_std=self.mutation_std)
 
 
 class Ecosystem():
-    def __init__(self, holotype, scoring_function, population_size=100, holdout='sqrt', mating=True):
+    def __init__(self, holotype, scoring_function, population_size=100, holdout='sqrt', new_blood=0.1, mating=True):
         self.population_size = population_size
         self.population = [holotype.organism_like() for _ in range(population_size)]
         self.scoring_function = scoring_function
@@ -104,6 +107,7 @@ class Ecosystem():
             self.holdout = max(1, int(holdout * population_size))
         else:
             self.holdout = max(1, int(holdout))
+        self.new_blood = max(1, int(new_blood * population_size))
         self.mating = True
 
 
@@ -126,11 +130,13 @@ class Ecosystem():
                 parent_2_idx = parent_1_idx
             offspring = self.population[parent_1_idx].mate(self.population[parent_2_idx])
             new_population.append(offspring)
-        return best_organism, best_score
+        
             
-
-        #new_population[-1] = self.population[0]
+        for i in range(1, self.new_blood+1):
+            new_population[-i] = self.population[0].organism_like()
+        new_population[-1] = self.population[0]
         self.population = new_population
+        return best_organism, best_score
 
 
     def get_best_organism(self, include_reward=False):
