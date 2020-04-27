@@ -21,8 +21,8 @@ class Organism():
     def _activation(self, output):
         """Return a specified activation function.
         
-        output - a function of the name of an ctivation function as a string.
-                 Must be one of "softmax", "sigmoid", "linear", "tanh". """
+        output - a function, or the name of an activation function as a string.
+                 String must be one of softmax, sigmoid, linear, tanh."""
         if output == 'softmax':
             return lambda X : np.exp(X) / np.sum(np.exp(X), axis=1).reshape(-1, 1)
         if output == 'sigmoid':
