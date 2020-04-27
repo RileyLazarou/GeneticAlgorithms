@@ -19,6 +19,10 @@ class Organism():
             self.biases.append(bias)
 
     def _activation(self, output):
+        """Return a specified activation function.
+        
+        output - a function of the name of an ctivation function as a string.
+                 Must be one of "softmax", "sigmoid", "linear", "tanh". """
         if output == 'softmax':
             return lambda X : np.exp(X) / np.sum(np.exp(X), axis=1).reshape(-1, 1)
         if output == 'sigmoid':
@@ -31,6 +35,7 @@ class Organism():
             return output
 
     def predict(self, X):
+        """Apply the function described by the organism to input X and return the output."""
         if not X.ndim == 2:
             raise ValueError(f'Input has {X.ndim} dimensions, expected 2')
         if not X.shape[1] == self.layers[0].shape[0]:
@@ -45,6 +50,12 @@ class Organism():
         return X
 
     def predict_choice(self, X, deterministic=True):
+        """Apply `predict` to X and return the organism's "choice".
+        
+        if deterministic then return the choice with the highest score.
+        if not deterministic then interpret output as probabilities and select
+        from them randomly, according to their probabilities.
+        """
         probabilities = self.predict(X)
         if deterministic:
             return np.argmax(probabilities, axis=1).reshape((-1, 1))
@@ -64,12 +75,14 @@ class Organism():
         return choices.reshape((-1,1))
 
     def mutate(self):
+        """Mutate the organism's weights in place."""
         for i in range(len(self.layers)):
             self.layers[i] += np.random.normal(0, self.mutation_std, self.layers[i].shape)
             if self.use_bias:
                 self.biases[i] += np.random.normal(0, self.mutation_std, self.biases[i].shape)
 
     def mate(self, other, mutate=True):
+        """Mate two organisms together, create an offspring, mutate it, and return it."""
         if self.use_bias != other.use_bias:
             raise ValueError('Both parents must use bias or not use bias')
         if not len(self.layers) == len(other.layers):
@@ -87,9 +100,7 @@ class Organism():
         return child
 
     def organism_like(self):
-        '''
-        Return a new organism with the same shape and activations but reinitialized weights
-        '''
+        """Return a new organism with the same shape and activations but reinitialized weights."""
         dimensions = [x.shape[0] for x in self.layers] + [self.layers[-1].shape[1]]
         return Organism(dimensions, use_bias=self.use_bias, output=self.output, mutation_std=self.mutation_std)
 
@@ -112,6 +123,7 @@ class Ecosystem():
 
 
     def generation(self, verbose=False):
+        """Run a single generation, evaluating, mating, and mutating organisms, returning the best one."""
         rewards = []
         for index, organism in enumerate(self.population):
             if verbose:
@@ -140,6 +152,7 @@ class Ecosystem():
 
 
     def get_best_organism(self, include_reward=False):
+        """Evaluate the ecosystem's organisms and return the best organism."""
         rewards = [self.scoring_function(x) for x in self.population]
         if include_reward:
             best = np.argsort(rewards)[-1]
@@ -149,9 +162,7 @@ class Ecosystem():
 
 
 def main():
-    '''
-    Learn and visualize a function from [0,1] to something else
-    '''
+    """Learn and visualize a function from [0,1] to something else"""
     import matplotlib.pyplot as plt
     actual_f = lambda x : np.sin(x*6*np.pi)  # the function to learn, y = sin(x * 6 * pi)
     loss_f = lambda y, y_hat : np.mean(np.abs(y - y_hat)**(2))  # the loss function (negative reward)
